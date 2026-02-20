@@ -100,20 +100,27 @@ export async function clearImages(): Promise<void> {
 }
 
 /**
- * Convert any image File (including HEIC from Photos app) to a web-friendly
- * format, resized to maxDimension. DNG files are converted to PNG to preserve
- * quality; all other formats are converted to JPEG.
+ * Web-safe mime types that Supabase Storage accepts and browsers can display.
+ * Files with these types can be uploaded directly without conversion.
  */
-export function convertToWebImage(file: File, maxDimension = 1600): Promise<File> {
-	const isDng = file.name.toLowerCase().endsWith('.dng');
-	const outMime = isDng ? 'image/png' : 'image/jpeg';
-	const outExt = isDng ? '.png' : '.jpeg';
+const WEB_SAFE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
+/**
+ * Convert an image File to a web-friendly format for upload.
+ * - Web-safe formats (JPEG, PNG, WebP, GIF) are returned as-is (no conversion).
+ * - Non-web formats (HEIC, DNG, etc.) are converted to JPEG via canvas.
+ */
+export async function convertToWebImage(file: File, maxDimension = 1600): Promise<File> {
+	// If already web-safe, return directly — no canvas needed
+	if (WEB_SAFE_TYPES.includes(file.type)) {
+		return file;
+	}
+
+	// For non-web formats, read as data URL then draw through canvas
+	const dataUrl = await readFileAsDataURL(file);
 	return new Promise((resolve, reject) => {
-		const url = URL.createObjectURL(file);
 		const img = new Image();
 		img.onload = () => {
-			URL.revokeObjectURL(url);
 			let { width, height } = img;
 			if (width > maxDimension || height > maxDimension) {
 				const ratio = Math.min(maxDimension / width, maxDimension / height);
@@ -128,21 +135,30 @@ export function convertToWebImage(file: File, maxDimension = 1600): Promise<File
 			canvas.toBlob(
 				(blob) => {
 					if (blob) {
-						const name = file.name.replace(/\.[^.]+$/, outExt);
-						resolve(new File([blob], name, { type: outMime }));
+						const name = file.name.replace(/\.[^.]+$/, '.jpeg');
+						resolve(new File([blob], name, { type: 'image/jpeg' }));
 					} else {
 						reject(new Error('Failed to convert image'));
 					}
 				},
-				outMime,
-				isDng ? undefined : 0.85
+				'image/jpeg',
+				0.85
 			);
 		};
 		img.onerror = () => {
-			URL.revokeObjectURL(url);
-			reject(new Error('Unable to load image — format may not be supported by this browser'));
+			reject(new Error('Unable to load image — this format may not be supported by your browser'));
 		};
-		img.src = url;
+		img.src = dataUrl;
+	});
+}
+
+/** Read a File into a data URL string. */
+function readFileAsDataURL(file: File): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => resolve(reader.result as string);
+		reader.onerror = () => reject(reader.error);
+		reader.readAsDataURL(file);
 	});
 }
 
