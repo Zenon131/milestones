@@ -57,6 +57,31 @@
     imageUrl = "";
   }
 
+  /**
+   * Resize & compress an image file to JPEG using createImageBitmap.
+   * Works with large files (80MB+) where new Image() fails.
+   */
+  async function resizeImage(file, maxDimension = 1600) {
+    // createImageBitmap works directly with File/Blob — no URL needed
+    const bitmap = await createImageBitmap(file);
+    let { width, height } = bitmap;
+    if (width > maxDimension || height > maxDimension) {
+      const ratio = Math.min(maxDimension / width, maxDimension / height);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+    }
+    const canvas = new OffscreenCanvas(width, height);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    const blob = await canvas.convertToBlob({
+      type: "image/jpeg",
+      quality: 0.85,
+    });
+    const name = file.name.replace(/\.[^.]+$/, ".jpeg");
+    return new File([blob], name, { type: "image/jpeg" });
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     uploading = true;
@@ -67,14 +92,17 @@
 
     try {
       if (rawImageFile) {
+        // Resize & compress to JPEG before uploading
+        const compressed = await resizeImage(rawImageFile);
+
         if (isSupabaseConfigured()) {
-          savedImageUrl = await uploadImage(rawImageFile);
+          savedImageUrl = await uploadImage(compressed);
           if (!savedImageUrl) {
             uploadError =
               "Image upload failed — milestone saved without photo.";
           }
         } else {
-          savedImageId = await saveImage(rawImageFile);
+          savedImageId = await saveImage(compressed);
         }
       } else if (imageUrl) {
         savedImageUrl = imageUrl;
