@@ -86,53 +86,61 @@
       <p>No milestones to display. <a href="/add-milestone">Add one</a>!</p>
     </div>
   {:else}
-    <div class="timeline-container" style="--zoom: {zoomLevel}">
-      {#each groupByYear(items) as [year, yearMilestones]}
-        <div class="year-group">
-          <div class="year-label">{year}</div>
-          <div class="year-items">
-            {#each yearMilestones as m, i}
-              <button
-                class="timeline-item"
-                class:right={i % 2 === 1}
-                onclick={() => selectMilestone(m)}
-              >
-                <div
-                  class="dot"
-                  style="background: {CATEGORY_COLORS[m.category]}"
-                ></div>
-                <div class="card">
-                  {#if getThumbSrc(m)}
-                    <div class="card-thumb">
-                      <img src={getThumbSrc(m)} alt={m.title} />
-                    </div>
-                  {/if}
-                  <div class="card-top">
-                    <span class="card-icon">{CATEGORY_ICONS[m.category]}</span>
-                    <span class="card-date">{formatDate(m.date)}</span>
-                  </div>
-                  <h3>{m.title}</h3>
-                  {#if m.location}
-                    <span class="card-location">📍 {m.location}</span>
-                  {/if}
-                  <p class="card-desc">
-                    {m.description.length > 120
-                      ? m.description.slice(0, 120) + "…"
-                      : m.description}
-                  </p>
+    <div class="timeline" style="--zoom: {zoomLevel}">
+      {#each groupByYear(items) as [year, yearMilestones], yi}
+        <div class="year-row" class:first={yi === 0}>
+          <div class="track-col year-track">
+            <div class="year-dot"></div>
+          </div>
+          <div class="year-badge">{year}</div>
+        </div>
+
+        {#each yearMilestones as m}
+          <button class="entry" onclick={() => selectMilestone(m)}>
+            <div class="track-col">
+              <div
+                class="dot"
+                style="--dot-color: {CATEGORY_COLORS[m.category]}"
+              ></div>
+            </div>
+            <div class="card">
+              {#if getThumbSrc(m)}
+                <div class="card-thumb">
+                  <img src={getThumbSrc(m)} alt={m.title} loading="lazy" />
+                </div>
+              {/if}
+              <div class="card-body">
+                <div class="card-meta">
+                  <span class="card-icon">{CATEGORY_ICONS[m.category]}</span>
+                  <time class="card-date">{formatDate(m.date)}</time>
                   <span
                     class="card-badge"
                     style="background: {CATEGORY_COLORS[
                       m.category
-                    ]}20; color: {CATEGORY_COLORS[m.category]}"
+                    ]}15; color: {CATEGORY_COLORS[m.category]}"
                     >{m.category}</span
                   >
                 </div>
-              </button>
-            {/each}
-          </div>
-        </div>
+                <h3 class="card-title">{m.title}</h3>
+                {#if m.location}
+                  <span class="card-location">📍 {m.location}</span>
+                {/if}
+                <p class="card-desc">
+                  {m.description.length > 120
+                    ? m.description.slice(0, 120) + "…"
+                    : m.description}
+                </p>
+              </div>
+            </div>
+          </button>
+        {/each}
       {/each}
+
+      <div class="timeline-end">
+        <div class="track-col year-track">
+          <div class="end-dot">💕</div>
+        </div>
+      </div>
     </div>
   {/if}
 </div>
@@ -207,93 +215,146 @@
     color: var(--text-secondary);
   }
 
-  .timeline-container {
+  /* ─── Timeline layout ─── */
+  .timeline {
+    --track-w: 48px;
+    --line-w: 3px;
+    --dot-size: 16px;
     position: relative;
-    padding-left: 40px;
     transform-origin: top left;
     transform: scale(var(--zoom));
+    padding-bottom: 1rem;
   }
 
-  .timeline-container::before {
+  /* Continuous vertical line — centered in the track column */
+  .timeline::before {
     content: "";
     position: absolute;
-    left: 18px;
+    left: calc(var(--track-w) / 2);
     top: 0;
     bottom: 0;
-    width: 3px;
-    background: var(--timeline-line);
-    border-radius: 2px;
+    width: var(--line-w);
+    background: linear-gradient(
+      to bottom,
+      var(--accent) 0%,
+      var(--timeline-line) 6%,
+      var(--timeline-line) 94%,
+      var(--accent) 100%
+    );
+    border-radius: var(--line-w);
+    transform: translateX(-50%);
   }
 
-  .year-group {
-    margin-bottom: 2rem;
-  }
-
-  .year-label {
-    position: relative;
-    left: -40px;
-    display: inline-flex;
-    padding: 0.4rem 1.2rem;
-    background: var(--accent);
-    color: white;
-    border-radius: var(--radius-full);
-    font-size: 0.9rem;
-    font-weight: 700;
+  /* ─── Year marker row ─── */
+  .year-row {
+    display: grid;
+    grid-template-columns: var(--track-w) 1fr;
+    align-items: center;
     margin-bottom: 1.25rem;
+    margin-top: 2.25rem;
+    position: relative;
     z-index: 2;
   }
 
-  .year-items {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
+  .year-row.first {
+    margin-top: 0;
   }
 
-  .timeline-item {
+  .year-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin: 0 auto;
     position: relative;
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    background: none;
+    z-index: 2;
+    box-shadow:
+      0 0 0 4px var(--bg-primary),
+      0 0 0 6px var(--accent);
+  }
+
+  .year-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 1.1rem;
+    background: var(--accent);
+    color: white;
+    border-radius: var(--radius-full);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    width: fit-content;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ─── Milestone entry ─── */
+  .entry {
+    display: grid;
+    grid-template-columns: var(--track-w) 1fr;
     border: none;
+    background: none;
     text-align: left;
     padding: 0;
     width: 100%;
     cursor: pointer;
+    margin-bottom: 1.5rem;
+    font-family: inherit;
+    color: inherit;
+  }
+
+  /* Track column — dot sits here, centered on the line */
+  .track-col {
+    display: flex;
+    justify-content: center;
+    padding-top: 1.25rem;
+    position: relative;
+  }
+
+  .year-track {
+    padding-top: 0;
   }
 
   .dot {
-    position: absolute;
-    left: -31px;
-    top: 1.1rem;
-    width: 14px;
-    height: 14px;
+    width: var(--dot-size);
+    height: var(--dot-size);
     border-radius: 50%;
+    background: var(--dot-color);
     border: 3px solid var(--bg-primary);
-    box-shadow: 0 0 0 2px var(--timeline-line);
+    box-shadow: 0 0 0 2px var(--dot-color);
+    position: relative;
     z-index: 2;
     flex-shrink: 0;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
   }
 
+  .entry:hover .dot {
+    transform: scale(1.4);
+    box-shadow:
+      0 0 0 3px var(--dot-color),
+      0 0 14px rgba(99, 102, 241, 0.3);
+  }
+
+  /* ─── Card ─── */
   .card {
-    flex: 1;
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    padding: 0;
-    transition: all 0.2s ease;
-    max-width: 560px;
     overflow: hidden;
+    transition: all 0.25s ease;
+    max-width: 520px;
   }
 
-  .card:hover {
+  .entry:hover .card {
     box-shadow: var(--shadow-md);
     border-color: var(--accent);
+    transform: translateX(4px);
   }
 
   .card-thumb {
     width: 100%;
-    height: 140px;
+    height: 160px;
     overflow: hidden;
   }
 
@@ -301,81 +362,117 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transition: transform 0.35s ease;
   }
 
-  .card-top {
+  .entry:hover .card-thumb img {
+    transform: scale(1.05);
+  }
+
+  .card-body {
+    padding: 1rem 1.25rem 1.1rem;
+  }
+
+  .card-meta {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 0.4rem;
-    padding: 1.1rem 1.25rem 0;
+    margin-bottom: 0.45rem;
+    flex-wrap: wrap;
   }
 
   .card-icon {
-    font-size: 1.1rem;
+    font-size: 1rem;
   }
 
   .card-date {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-muted);
     font-weight: 500;
   }
 
-  .card h3 {
+  .card-badge {
+    margin-left: auto;
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .card-title {
     font-size: 1.05rem;
     font-weight: 700;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.25rem;
     color: var(--text-primary);
-    padding: 0 1.25rem;
+    line-height: 1.35;
   }
 
   .card-location {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: var(--text-secondary);
     display: block;
-    margin-bottom: 0.4rem;
-    padding: 0 1.25rem;
+    margin-bottom: 0.3rem;
   }
 
   .card-desc {
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     color: var(--text-secondary);
-    line-height: 1.5;
-    margin-bottom: 0.6rem;
-    padding: 0 1.25rem;
+    line-height: 1.55;
+    margin: 0;
   }
 
-  .card-badge {
-    display: inline-block;
-    padding: 0.2rem 0.6rem;
-    border-radius: var(--radius-full);
-    font-size: 0.72rem;
-    font-weight: 600;
-    margin: 0 1.25rem 1.1rem;
+  /* ─── End cap ─── */
+  .timeline-end {
+    display: grid;
+    grid-template-columns: var(--track-w) 1fr;
+    padding-top: 0.5rem;
   }
 
+  .end-dot {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    box-shadow:
+      0 0 0 4px var(--bg-primary),
+      0 0 0 6px var(--accent),
+      0 0 20px rgba(99, 102, 241, 0.3);
+  }
+
+  /* ─── Responsive ─── */
   @media (max-width: 600px) {
     h1 {
       font-size: 1.35rem;
     }
 
-    .timeline-container {
-      padding-left: 30px;
+    .timeline {
+      --track-w: 36px;
+      --dot-size: 14px;
     }
 
-    .timeline-container::before {
-      left: 12px;
+    .card {
+      max-width: none;
     }
 
-    .dot {
-      left: -25px;
-      width: 12px;
-      height: 12px;
+    .card-thumb {
+      height: 120px;
     }
 
-    .year-label {
-      left: -30px;
-      font-size: 0.8rem;
+    .card-body {
+      padding: 0.85rem 1rem;
+    }
+
+    .year-badge {
+      font-size: 0.78rem;
+      padding: 0.3rem 0.85rem;
     }
   }
 </style>
