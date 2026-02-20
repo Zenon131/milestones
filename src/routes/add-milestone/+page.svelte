@@ -1,10 +1,9 @@
 <script>
   import { milestones } from "$lib/stores/milestones";
-  import { saveImage, convertToWebImage } from "$lib/stores/imageStore";
+  import { saveImage } from "$lib/stores/imageStore";
   import { isSupabaseConfigured } from "$lib/supabaseClient";
   import { uploadImage } from "$lib/stores/supabaseStore";
   import { CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from "$lib/types";
-  import { untrack } from "svelte";
 
   let date = $state("");
   let title = $state("");
@@ -12,9 +11,9 @@
   let category = $state("Event");
   let location = $state("");
   let imageUrl = $state("");
-  let imageFile = $state(null);
-  /** Keep a raw (unproxied) reference to the File for canvas/blob APIs. */
+  /** Raw File object — never use $state for File objects (Svelte proxy breaks blob APIs). */
   let rawImageFile = null;
+  let hasImage = $state(false);
   let imagePreviewSrc = $state("");
   let uploading = $state(false);
   let dragOver = $state(false);
@@ -22,31 +21,15 @@
   let uploadError = $state("");
   let useUrl = $state(false);
 
-  // Raw camera formats browsers cannot decode
-  const UNSUPPORTED_EXTENSIONS = [
-    ".dng",
-    ".raw",
-    ".cr2",
-    ".nef",
-    ".arw",
-    ".orf",
-    ".rw2",
-  ];
-
   function handleFileSelect(file) {
     if (!file) return;
-    const ext = "." + file.name.split(".").pop().toLowerCase();
-    if (UNSUPPORTED_EXTENSIONS.includes(ext)) {
-      uploadError = `${ext.toUpperCase().slice(1)} files are not supported — please export as JPEG or PNG first.`;
-      return;
-    }
     if (!file.type.startsWith("image/")) {
-      uploadError = "Please select an image file.";
+      uploadError = "Please select an image file (JPEG, PNG, WebP, or GIF).";
       return;
     }
     uploadError = "";
     rawImageFile = file;
-    imageFile = file;
+    hasImage = true;
     imageUrl = "";
     const reader = new FileReader();
     reader.onload = () => {
@@ -69,7 +52,7 @@
 
   function removeImage() {
     rawImageFile = null;
-    imageFile = null;
+    hasImage = false;
     imagePreviewSrc = "";
     imageUrl = "";
   }
@@ -82,46 +65,19 @@
     let savedImageId = undefined;
     let savedImageUrl = undefined;
 
-    console.log(
-      "[submit] imageFile:",
-      imageFile,
-      "rawImageFile:",
-      rawImageFile,
-      "supabase:",
-      isSupabaseConfigured(),
-    );
-
     try {
-      if (imageFile && rawImageFile) {
-        console.log("[submit] Converting image...");
-        // Convert to JPEG first (handles HEIC from Photos app, BMP, TIFF, etc.)
-        // Use rawImageFile (not the Svelte $state proxy) so canvas/blob APIs work
-        const webFile = await convertToWebImage(rawImageFile);
-        console.log(
-          "[submit] Converted:",
-          webFile.name,
-          webFile.type,
-          webFile.size,
-        );
-
+      if (rawImageFile) {
         if (isSupabaseConfigured()) {
-          console.log("[submit] Uploading to Supabase...");
-          // Upload to Supabase Storage → get public URL
-          savedImageUrl = await uploadImage(webFile);
-          console.log("[submit] Upload result:", savedImageUrl);
+          savedImageUrl = await uploadImage(rawImageFile);
           if (!savedImageUrl) {
             uploadError =
               "Image upload failed — milestone saved without photo.";
           }
         } else {
-          console.log("[submit] Saving to IndexedDB...");
-          // Fallback: store in IndexedDB
-          savedImageId = await saveImage(webFile);
+          savedImageId = await saveImage(rawImageFile);
         }
       } else if (imageUrl) {
         savedImageUrl = imageUrl;
-      } else {
-        console.log("[submit] No image to upload");
       }
 
       await milestones.add({
@@ -142,7 +98,7 @@
       location = "";
       imageUrl = "";
       rawImageFile = null;
-      imageFile = null;
+      hasImage = false;
       imagePreviewSrc = "";
       useUrl = false;
       setTimeout(() => {
@@ -246,10 +202,10 @@
             />
           </div>
           <div class="image-info">
-            {#if imageFile}
-              <span class="file-name">📎 {imageFile.name}</span>
+            {#if hasImage}
+              <span class="file-name">📎 {rawImageFile?.name}</span>
               <span class="file-size"
-                >{(imageFile.size / 1024).toFixed(0)} KB</span
+                >{((rawImageFile?.size || 0) / 1024).toFixed(0)} KB</span
               >
             {:else}
               <span class="file-name">🔗 External URL</span>
@@ -280,7 +236,7 @@
           <input
             type="file"
             id="imageFileInput"
-            accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
+            accept="image/*"
             onchange={handleFileInput}
             hidden
           />
@@ -305,7 +261,8 @@
             placeholder="https://example.com/photo.jpg"
             oninput={() => {
               imagePreviewSrc = "";
-              imageFile = null;
+              rawImageFile = null;
+              hasImage = false;
             }}
           />
         {/if}
