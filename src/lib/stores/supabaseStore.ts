@@ -110,7 +110,9 @@ export async function uploadImage(file: File): Promise<string | null> {
 	const ext = file.name.split('.').pop() || 'jpg';
 	const path = `${crypto.randomUUID()}.${ext}`;
 
-	const { error } = await supabase.storage
+	console.log('[upload] file:', file.name, 'type:', file.type, 'size:', file.size, 'path:', path);
+
+	const { data, error } = await supabase.storage
 		.from('milestone-images')
 		.upload(path, file, {
 			contentType: file.type,
@@ -118,13 +120,17 @@ export async function uploadImage(file: File): Promise<string | null> {
 		});
 
 	if (error) {
-		console.error('Failed to upload image:', error.message);
+		console.error('[upload] Failed:', error.message, error);
 		return null;
 	}
+
+	console.log('[upload] Success, data:', data);
 
 	const { data: urlData } = supabase.storage
 		.from('milestone-images')
 		.getPublicUrl(path);
+
+	console.log('[upload] Public URL:', urlData.publicUrl);
 
 	return urlData.publicUrl;
 }

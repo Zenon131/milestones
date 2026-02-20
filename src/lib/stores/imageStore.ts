@@ -108,7 +108,8 @@ const WEB_SAFE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 /**
  * Convert an image File to a web-friendly format for upload.
  * - Web-safe formats (JPEG, PNG, WebP, GIF) are returned as-is (no conversion).
- * - Non-web formats (HEIC, DNG, etc.) are converted to JPEG via canvas.
+ * - Non-web formats (HEIC on Safari, etc.) are converted to JPEG via canvas.
+ * - Times out after 15 seconds to prevent hanging on unsupported formats.
  */
 export async function convertToWebImage(file: File, maxDimension = 1600): Promise<File> {
 	// If already web-safe, return directly — no canvas needed
@@ -116,11 +117,21 @@ export async function convertToWebImage(file: File, maxDimension = 1600): Promis
 		return file;
 	}
 
-	// For non-web formats, read as data URL then draw through canvas
+	// Reject very large raw files (over 100MB)
+	if (file.size > 100 * 1024 * 1024) {
+		throw new Error('File is too large (>100MB). Please export as JPEG or PNG first.');
+	}
+
+	// For non-web formats, read as data URL then draw through canvas (with timeout)
 	const dataUrl = await readFileAsDataURL(file);
 	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			reject(new Error('Image conversion timed out — this format may not be supported. Please export as JPEG or PNG.'));
+		}, 15000);
+
 		const img = new Image();
 		img.onload = () => {
+			clearTimeout(timeout);
 			let { width, height } = img;
 			if (width > maxDimension || height > maxDimension) {
 				const ratio = Math.min(maxDimension / width, maxDimension / height);
@@ -146,7 +157,8 @@ export async function convertToWebImage(file: File, maxDimension = 1600): Promis
 			);
 		};
 		img.onerror = () => {
-			reject(new Error('Unable to load image — this format may not be supported by your browser'));
+			clearTimeout(timeout);
+			reject(new Error('Unable to load image — please export as JPEG or PNG first.'));
 		};
 		img.src = dataUrl;
 	});

@@ -22,24 +22,29 @@
   let uploadError = $state("");
   let useUrl = $state(false);
 
-  const RAW_EXTENSIONS = [
+  // Raw camera formats browsers cannot decode
+  const UNSUPPORTED_EXTENSIONS = [
     ".dng",
-    ".heic",
-    ".heif",
     ".raw",
     ".cr2",
     ".nef",
     ".arw",
+    ".orf",
+    ".rw2",
   ];
 
-  function isImageFile(file) {
-    if (file.type.startsWith("image/")) return true;
-    const ext = "." + file.name.split(".").pop().toLowerCase();
-    return RAW_EXTENSIONS.includes(ext);
-  }
-
   function handleFileSelect(file) {
-    if (!file || !isImageFile(file)) return;
+    if (!file) return;
+    const ext = "." + file.name.split(".").pop().toLowerCase();
+    if (UNSUPPORTED_EXTENSIONS.includes(ext)) {
+      uploadError = `${ext.toUpperCase().slice(1)} files are not supported — please export as JPEG or PNG first.`;
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      uploadError = "Please select an image file.";
+      return;
+    }
+    uploadError = "";
     rawImageFile = file;
     imageFile = file;
     imageUrl = "";
@@ -77,25 +82,46 @@
     let savedImageId = undefined;
     let savedImageUrl = undefined;
 
+    console.log(
+      "[submit] imageFile:",
+      imageFile,
+      "rawImageFile:",
+      rawImageFile,
+      "supabase:",
+      isSupabaseConfigured(),
+    );
+
     try {
       if (imageFile && rawImageFile) {
+        console.log("[submit] Converting image...");
         // Convert to JPEG first (handles HEIC from Photos app, BMP, TIFF, etc.)
         // Use rawImageFile (not the Svelte $state proxy) so canvas/blob APIs work
         const webFile = await convertToWebImage(rawImageFile);
+        console.log(
+          "[submit] Converted:",
+          webFile.name,
+          webFile.type,
+          webFile.size,
+        );
 
         if (isSupabaseConfigured()) {
+          console.log("[submit] Uploading to Supabase...");
           // Upload to Supabase Storage → get public URL
           savedImageUrl = await uploadImage(webFile);
+          console.log("[submit] Upload result:", savedImageUrl);
           if (!savedImageUrl) {
             uploadError =
               "Image upload failed — milestone saved without photo.";
           }
         } else {
+          console.log("[submit] Saving to IndexedDB...");
           // Fallback: store in IndexedDB
           savedImageId = await saveImage(webFile);
         }
       } else if (imageUrl) {
         savedImageUrl = imageUrl;
+      } else {
+        console.log("[submit] No image to upload");
       }
 
       await milestones.add({
@@ -254,14 +280,14 @@
           <input
             type="file"
             id="imageFileInput"
-            accept="image/*,.dng,.heic,.heif,.raw,.cr2,.nef,.arw"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
             onchange={handleFileInput}
             hidden
           />
           <span class="upload-icon">📷</span>
           <span class="upload-text">Drop a photo here or click to browse</span>
           <span class="upload-hint"
-            >Any format including HEIC & DNG — auto-converted to JPEG</span
+            >JPEG, PNG, WebP, or HEIC — auto-converted if needed</span
           >
         </div>
         <button
