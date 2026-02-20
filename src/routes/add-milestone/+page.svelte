@@ -19,8 +19,24 @@
   let uploadError = $state("");
   let useUrl = $state(false);
 
+  const RAW_EXTENSIONS = [
+    ".dng",
+    ".heic",
+    ".heif",
+    ".raw",
+    ".cr2",
+    ".nef",
+    ".arw",
+  ];
+
+  function isImageFile(file) {
+    if (file.type.startsWith("image/")) return true;
+    const ext = "." + file.name.split(".").pop().toLowerCase();
+    return RAW_EXTENSIONS.includes(ext);
+  }
+
   function handleFileSelect(file) {
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!file || !isImageFile(file)) return;
     imageFile = file;
     imageUrl = "";
     const reader = new FileReader();
@@ -231,14 +247,14 @@
           <input
             type="file"
             id="imageFileInput"
-            accept="image/*"
+            accept="image/*,.dng,.heic,.heif,.raw,.cr2,.nef,.arw"
             onchange={handleFileInput}
             hidden
           />
           <span class="upload-icon">📷</span>
           <span class="upload-text">Drop a photo here or click to browse</span>
           <span class="upload-hint"
-            >Any format including HEIC — auto-converted to JPEG</span
+            >Any format including HEIC & DNG — auto-converted to JPEG</span
           >
         </div>
         <button
