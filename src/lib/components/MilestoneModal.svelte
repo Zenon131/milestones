@@ -176,14 +176,14 @@
 
   .image-container {
     width: 100%;
-    max-height: 300px;
     overflow: hidden;
   }
 
   .image-container img {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    height: auto;
+    display: block;
+    object-fit: contain;
   }
 
   .modal-body {
