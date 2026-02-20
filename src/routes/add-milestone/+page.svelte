@@ -4,6 +4,7 @@
   import { isSupabaseConfigured } from "$lib/supabaseClient";
   import { uploadImage } from "$lib/stores/supabaseStore";
   import { CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from "$lib/types";
+  import { untrack } from "svelte";
 
   let date = $state("");
   let title = $state("");
@@ -12,6 +13,8 @@
   let location = $state("");
   let imageUrl = $state("");
   let imageFile = $state(null);
+  /** Keep a raw (unproxied) reference to the File for canvas/blob APIs. */
+  let rawImageFile = null;
   let imagePreviewSrc = $state("");
   let uploading = $state(false);
   let dragOver = $state(false);
@@ -37,6 +40,7 @@
 
   function handleFileSelect(file) {
     if (!file || !isImageFile(file)) return;
+    rawImageFile = file;
     imageFile = file;
     imageUrl = "";
     const reader = new FileReader();
@@ -59,6 +63,7 @@
   }
 
   function removeImage() {
+    rawImageFile = null;
     imageFile = null;
     imagePreviewSrc = "";
     imageUrl = "";
@@ -73,9 +78,10 @@
     let savedImageUrl = undefined;
 
     try {
-      if (imageFile) {
+      if (imageFile && rawImageFile) {
         // Convert to JPEG first (handles HEIC from Photos app, BMP, TIFF, etc.)
-        const webFile = await convertToWebImage(imageFile);
+        // Use rawImageFile (not the Svelte $state proxy) so canvas/blob APIs work
+        const webFile = await convertToWebImage(rawImageFile);
 
         if (isSupabaseConfigured()) {
           // Upload to Supabase Storage → get public URL
@@ -109,6 +115,7 @@
       category = "Event";
       location = "";
       imageUrl = "";
+      rawImageFile = null;
       imageFile = null;
       imagePreviewSrc = "";
       useUrl = false;
