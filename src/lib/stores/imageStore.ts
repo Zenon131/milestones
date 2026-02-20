@@ -101,9 +101,14 @@ export async function clearImages(): Promise<void> {
 
 /**
  * Convert any image File (including HEIC from Photos app) to a web-friendly
- * JPEG File, resized to maxDimension. Always outputs image/jpeg regardless of input format.
+ * format, resized to maxDimension. DNG files are converted to PNG to preserve
+ * quality; all other formats are converted to JPEG.
  */
 export function convertToWebImage(file: File, maxDimension = 1600): Promise<File> {
+	const isDng = file.name.toLowerCase().endsWith('.dng');
+	const outMime = isDng ? 'image/png' : 'image/jpeg';
+	const outExt = isDng ? '.png' : '.jpeg';
+
 	return new Promise((resolve, reject) => {
 		const url = URL.createObjectURL(file);
 		const img = new Image();
@@ -123,14 +128,14 @@ export function convertToWebImage(file: File, maxDimension = 1600): Promise<File
 			canvas.toBlob(
 				(blob) => {
 					if (blob) {
-						const name = file.name.replace(/\.[^.]+$/, '.jpeg');
-						resolve(new File([blob], name, { type: 'image/jpeg' }));
+						const name = file.name.replace(/\.[^.]+$/, outExt);
+						resolve(new File([blob], name, { type: outMime }));
 					} else {
 						reject(new Error('Failed to convert image'));
 					}
 				},
-				'image/jpeg',
-				0.85
+				outMime,
+				isDng ? undefined : 0.85
 			);
 		};
 		img.onerror = () => {
